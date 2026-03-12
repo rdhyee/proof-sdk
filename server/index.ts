@@ -7,7 +7,7 @@ import { apiRoutes } from './routes.js';
 import { agentRoutes } from './agent-routes.js';
 import { setupWebSocket } from './ws.js';
 import { createBridgeMountRouter } from './bridge.js';
-import { getCollabRuntime, startCollabRuntimeEmbedded } from './collab.js';
+import { getCollabRuntime, startCollabRuntimeEmbedded, startCollabRuntimeAttached } from './collab.js';
 import { discoveryRoutes } from './discovery-routes.js';
 import { shareWebRoutes } from './share-web-routes.js';
 import {
@@ -39,7 +39,8 @@ function parseAllowedCorsOrigins(): Set<string> {
 async function main(): Promise<void> {
   const app = express();
   const server = createServer(app);
-  const wss = new WebSocketServer({ server, path: '/ws' });
+  // Use noServer mode so the /ws WSS doesn't reject upgrade requests for /collab
+  const wss = new WebSocketServer({ noServer: true });
   wss.on('error', (error) => {
     console.error('[server] WebSocketServer error (non-fatal):', error);
   });
@@ -129,7 +130,26 @@ async function main(): Promise<void> {
   app.use(shareWebRoutes);
 
   setupWebSocket(wss);
-  await startCollabRuntimeEmbedded(PORT);
+
+  // Use attached mode so collab WebSocket shares the main HTTP server.
+  const useAttached = (process.env.COLLAB_ATTACH_TO_MAIN_HTTP || '').trim().toLowerCase();
+  if (useAttached === '1' || useAttached === 'true' || useAttached === 'yes') {
+    await startCollabRuntimeAttached(server, PORT);
+  } else {
+    await startCollabRuntimeEmbedded(PORT);
+  }
+
+  // Manual upgrade routing: /ws goes to share WSS, /collab goes to collab handler
+  server.on('upgrade', (request, socket, head) => {
+    const pathname = new URL(request.url || '/', 'http://localhost').pathname;
+    if (pathname === '/ws') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
+    // /collab is handled by the collab runtime's own upgrade handler (added by startCollabRuntimeAttached)
+    // Other paths: do nothing (connection will timeout/close)
+  });
 
   server.listen(PORT, () => {
     console.log(`[proof-sdk] listening on http://127.0.0.1:${PORT}`);
