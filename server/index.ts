@@ -10,6 +10,7 @@ import { createBridgeMountRouter } from './bridge.js';
 import { getCollabRuntime, startCollabRuntimeEmbedded, startCollabRuntimeAttached, shouldAttachToMainHttpServer } from './collab.js';
 import { discoveryRoutes } from './discovery-routes.js';
 import { shareWebRoutes } from './share-web-routes.js';
+import { metricsApiRoutes } from './metrics.js';
 import {
   capabilitiesPayload,
   enforceApiClientCompatibility,
@@ -128,6 +129,7 @@ async function main(): Promise<void> {
   app.use('/documents', createBridgeMountRouter(enforceBridgeClientCompatibility));
   app.use('/documents', agentRoutes);
   app.use(shareWebRoutes);
+  app.use('/api/metrics', metricsApiRoutes);
 
   setupWebSocket(wss);
 
