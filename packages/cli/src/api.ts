@@ -77,7 +77,8 @@ export interface Block {
 
 export interface Snapshot {
   blocks: Block[];
-  revision: number;
+  revision?: number;
+  mutationBase?: { token: string };
 }
 
 export async function getSnapshot(ctx: ApiContext, slug: string): Promise<Snapshot> {
@@ -96,7 +97,15 @@ interface EditOperation {
 interface EditRequest {
   by: string;
   operations: EditOperation[];
-  baseRevision: number;
+  baseRevision?: number;
+  baseToken?: string;
+}
+
+/** Build the base precondition from a snapshot (baseToken for hosted, baseRevision for self-hosted). */
+function snapshotBase(snap: Snapshot): Pick<EditRequest, 'baseRevision' | 'baseToken'> {
+  if (snap.mutationBase?.token) return { baseToken: snap.mutationBase.token };
+  if (typeof snap.revision === 'number') return { baseRevision: snap.revision };
+  throw new Error('Snapshot has neither mutationBase.token nor revision — cannot build edit precondition');
 }
 
 export async function editV2(
@@ -111,7 +120,7 @@ export async function editV2(
   });
 }
 
-/** Append text after the last block. Fetches a fresh snapshot for baseRevision. */
+/** Append text after the last block. Fetches a fresh snapshot for mutation base. */
 export async function appendText(ctx: ApiContext, slug: string, markdown: string): Promise<unknown> {
   const snap = await getSnapshot(ctx, slug);
   if (!snap.blocks || snap.blocks.length === 0) {
@@ -121,7 +130,7 @@ export async function appendText(ctx: ApiContext, slug: string, markdown: string
 
   return editV2(ctx, slug, {
     by: `ai:${ctx.agentId}`,
-    baseRevision: snap.revision,
+    ...snapshotBase(snap),
     operations: [{
       op: 'insert_after',
       ref: lastRef,
@@ -136,7 +145,7 @@ export async function replaceBlock(ctx: ApiContext, slug: string, ref: string, m
 
   return editV2(ctx, slug, {
     by: `ai:${ctx.agentId}`,
-    baseRevision: snap.revision,
+    ...snapshotBase(snap),
     operations: [{
       op: 'replace_block',
       ref,

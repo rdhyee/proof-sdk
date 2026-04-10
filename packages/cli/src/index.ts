@@ -106,7 +106,12 @@ async function cmdSnapshot(args: string[], flags: Record<string, string | boolea
     for (const block of snap.blocks) {
       console.log(`[${block.ref}] ${block.markdown}`);
     }
-    console.log(`\nrevision: ${snap.revision}`);
+    if (snap.mutationBase?.token) {
+      console.log(`\nbaseToken: ${snap.mutationBase.token}`);
+    }
+    if (typeof snap.revision === 'number') {
+      console.log(`revision: ${snap.revision}`);
+    }
   }
 }
 
