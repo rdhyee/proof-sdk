@@ -2213,7 +2213,7 @@ function isLocalWsUrlBase(value: string): boolean {
   }
 }
 
-function shouldAttachToMainHttpServer(): boolean {
+export function shouldAttachToMainHttpServer(): boolean {
   const raw = (process.env.COLLAB_ATTACH_TO_MAIN_HTTP || '').trim().toLowerCase();
   return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
 }
