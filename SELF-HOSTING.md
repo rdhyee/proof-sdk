@@ -28,6 +28,10 @@ rsync -az --exclude=.git --exclude=node_modules --exclude=.env \
 
 # Install production deps on server
 ssh user@server "cd /var/www/proof-editor && npm install --omit=dev"
+
+# tsx (TypeScript runner) is a devDependency, but the server needs it at runtime.
+# Install it globally so the systemd ExecStart can find it:
+ssh user@server "npm install -g tsx"
 ```
 
 ### 3. Environment

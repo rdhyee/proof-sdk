@@ -133,11 +133,18 @@ async function main(): Promise<void> {
 
   // Use attached mode so collab WebSocket shares the main HTTP server.
   // Reuse the canonical helper from collab.ts (accepts 1|true|yes|on).
-  if (shouldAttachToMainHttpServer()) {
+  const collabAttached = shouldAttachToMainHttpServer();
+  if (collabAttached) {
     await startCollabRuntimeAttached(server, PORT);
   } else {
     await startCollabRuntimeEmbedded(PORT);
   }
+
+  // Check whether the collab runtime actually registered its upgrade handler.
+  // startCollabRuntimeAttached can exit early (PROOF_COLLAB_V2=false, or missing
+  // signing secret on non-local URLs) without installing the /collab listener.
+  const collabRuntime = getCollabRuntime();
+  const collabUpgradeActive = collabAttached && collabRuntime.enabled;
 
   // Read COLLAB_PATH so the upgrade router matches the same path the collab
   // runtime is listening on (default: /collab).
@@ -155,12 +162,13 @@ async function main(): Promise<void> {
         });
         return;
       }
-      if (pathname === collabPath) {
+      if (pathname === collabPath && collabUpgradeActive) {
         // Handled by the collab runtime's own upgrade listener
         // (registered by startCollabRuntimeAttached on the same server).
         return;
       }
-      // Reject unknown upgrade paths to avoid dangling connections.
+      // Reject unknown upgrade paths (or /collab when runtime didn't start)
+      // to avoid dangling connections.
       socket.destroy();
     } catch (error) {
       console.error('[server] upgrade handler error:', error);
