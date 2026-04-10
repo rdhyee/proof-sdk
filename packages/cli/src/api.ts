@@ -63,7 +63,6 @@ async function request<T>(ctx: ApiContext, path: string, init: RequestInit = {})
 export interface DocState {
   content: string;
   marks?: unknown[];
-  mutationBase?: { token: string };
   revision?: number;
 }
 
@@ -78,8 +77,7 @@ export interface Block {
 
 export interface Snapshot {
   blocks: Block[];
-  mutationBase?: { token: string };
-  revision?: number;
+  revision: number;
 }
 
 export async function getSnapshot(ctx: ApiContext, slug: string): Promise<Snapshot> {
@@ -98,8 +96,7 @@ interface EditOperation {
 interface EditRequest {
   by: string;
   operations: EditOperation[];
-  baseToken?: string;
-  baseRevision?: number;
+  baseRevision: number;
 }
 
 export async function editV2(
@@ -114,7 +111,7 @@ export async function editV2(
   });
 }
 
-/** Append text after the last block. Fetches a fresh snapshot for base token. */
+/** Append text after the last block. Fetches a fresh snapshot for baseRevision. */
 export async function appendText(ctx: ApiContext, slug: string, markdown: string): Promise<unknown> {
   const snap = await getSnapshot(ctx, slug);
   if (!snap.blocks || snap.blocks.length === 0) {
@@ -122,45 +119,30 @@ export async function appendText(ctx: ApiContext, slug: string, markdown: string
   }
   const lastRef = snap.blocks[snap.blocks.length - 1].ref;
 
-  const body: EditRequest = {
+  return editV2(ctx, slug, {
     by: `ai:${ctx.agentId}`,
+    baseRevision: snap.revision,
     operations: [{
       op: 'insert_after',
       ref: lastRef,
       blocks: [{ markdown }],
     }],
-  };
-
-  // Auto-detect: hosted uses baseRevision (integer), self-hosted uses baseToken (string)
-  if (typeof snap.revision === 'number') {
-    body.baseRevision = snap.revision;
-  } else if (snap.mutationBase?.token) {
-    body.baseToken = snap.mutationBase.token;
-  }
-
-  return editV2(ctx, slug, body);
+  });
 }
 
 /** Replace a specific block's content. */
 export async function replaceBlock(ctx: ApiContext, slug: string, ref: string, markdown: string): Promise<unknown> {
   const snap = await getSnapshot(ctx, slug);
 
-  const body: EditRequest = {
+  return editV2(ctx, slug, {
     by: `ai:${ctx.agentId}`,
+    baseRevision: snap.revision,
     operations: [{
       op: 'replace_block',
       ref,
       block: { markdown },
     }],
-  };
-
-  if (typeof snap.revision === 'number') {
-    body.baseRevision = snap.revision;
-  } else if (snap.mutationBase?.token) {
-    body.baseToken = snap.mutationBase.token;
-  }
-
-  return editV2(ctx, slug, body);
+  });
 }
 
 // --- Create document ---
