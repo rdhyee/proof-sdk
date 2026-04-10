@@ -185,6 +185,9 @@ export async function getHealth(baseUrl: string): Promise<unknown> {
 /** Post an ops mutation. Fetches current state for baseRevision and includes Idempotency-Key. */
 async function postOps(ctx: ApiContext, slug: string, payload: Record<string, unknown>): Promise<unknown> {
   const state = await getState(ctx, slug);
+  if (typeof state.revision !== 'number') {
+    console.warn('warning: state response did not include revision — ops may be rejected on stricter runtimes');
+  }
   return requestDoc(ctx, slug, '/ops', {
     method: 'POST',
     body: JSON.stringify({
