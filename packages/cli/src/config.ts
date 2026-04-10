@@ -71,22 +71,24 @@ export function resolveDoc(
   }
 
   let baseUrl: string;
+  let instanceAgentId: string | undefined;
   if (flags.url) {
     baseUrl = flags.url.replace(/\/+$/, '');
   } else if (flags.instance) {
     const inst = config.instances[flags.instance];
     if (!inst) throw new Error(`Instance "${flags.instance}" not found in config.`);
     baseUrl = inst.url;
+    instanceAgentId = inst.agentId;
   } else if (config.defaultInstance) {
     const inst = config.instances[config.defaultInstance];
     if (!inst) throw new Error(`Default instance "${config.defaultInstance}" not found in config.`);
     baseUrl = inst.url;
+    instanceAgentId = inst.agentId;
   } else {
     throw new Error('No --url, --instance, or default instance configured.');
   }
 
-  const agentId = config.defaultAgentId;
-  return { baseUrl, slug: ref, token, agentId };
+  return { baseUrl, slug: ref, token, agentId: instanceAgentId ?? config.defaultAgentId };
 }
 
 /** Parse a full Proof URL into components: https://host/d/slug?token=xxx */

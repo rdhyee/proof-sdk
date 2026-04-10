@@ -182,20 +182,30 @@ export async function getHealth(baseUrl: string): Promise<unknown> {
 
 // --- Comments & Suggestions ---
 
+/** Post an ops mutation. Fetches current state for baseRevision and includes Idempotency-Key. */
+async function postOps(ctx: ApiContext, slug: string, payload: Record<string, unknown>): Promise<unknown> {
+  const state = await getState(ctx, slug);
+  return requestDoc(ctx, slug, '/ops', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...payload,
+      ...(typeof state.revision === 'number' ? { baseRevision: state.revision } : {}),
+    }),
+    headers: { 'Idempotency-Key': randomUUID() },
+  });
+}
+
 export async function addComment(
   ctx: ApiContext,
   slug: string,
   quote: string,
   text: string,
 ): Promise<unknown> {
-  return requestDoc(ctx, slug, '/ops', {
-    method: 'POST',
-    body: JSON.stringify({
-      type: 'comment.add',
-      by: `ai:${ctx.agentId}`,
-      quote,
-      text,
-    }),
+  return postOps(ctx, slug, {
+    type: 'comment.add',
+    by: `ai:${ctx.agentId}`,
+    quote,
+    text,
   });
 }
 
@@ -206,14 +216,11 @@ export async function addSuggestion(
   content: string,
   kind: 'replace' | 'insert' | 'delete' = 'replace',
 ): Promise<unknown> {
-  return requestDoc(ctx, slug, '/ops', {
-    method: 'POST',
-    body: JSON.stringify({
-      type: 'suggestion.add',
-      by: `ai:${ctx.agentId}`,
-      kind,
-      quote,
-      content,
-    }),
+  return postOps(ctx, slug, {
+    type: 'suggestion.add',
+    by: `ai:${ctx.agentId}`,
+    kind,
+    quote,
+    content,
   });
 }
